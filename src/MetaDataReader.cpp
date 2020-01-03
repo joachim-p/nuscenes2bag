@@ -48,6 +48,9 @@ MetaDataReader::loadFromDirectory(const fs::path& directoryPath)
   const fs::path calibratedSensorFile =
     directoryPath / "calibrated_sensor.json";
   const fs::path sensorFile = directoryPath / "sensor.json";
+  const fs::path categoryFile = directoryPath / "category.json";
+  const fs::path instanceFile = directoryPath / "instance.json";
+  const fs::path sampleAnnotationFile = directoryPath / "sample_annotation.json";
 
   scenes = loadScenesFromFile(sceneFile);
   scene2Samples = loadSampleInfos(sampleFile);
@@ -55,6 +58,27 @@ MetaDataReader::loadFromDirectory(const fs::path& directoryPath)
   calibratedSensorToken2CalibratedSensorInfo =
     loadCalibratedSensorInfo(calibratedSensorFile);
   sensorToken2CalibratedSensorName = loadCalibratedSensorNames(sensorFile);
+  //attributeInfo = loadAttributeInfo(attributeFile);
+  categories = loadCategories(categoryFile);
+  instances = loadInstances(instanceFile);
+  sample2SampleAnnotations = loadSampleAnnotations(sampleAnnotationFile);
+
+  // Decorate (add short-cut) sample_annotation info with the category name
+  for (auto& sample2SampleAnnotation : sample2SampleAnnotations)
+  {
+    for (auto& sampleAnnotation : sample2SampleAnnotation.second)
+    {
+      const auto& instanceInfo = findOrThrow(instances,
+                                             sampleAnnotation.instanceToken,
+                                             "unable to find instance_token");
+
+      const auto& categoryInfo = findOrThrow(categories,
+                                             instanceInfo.categoryToken,
+                                             "unable to find category_token");
+
+      sampleAnnotation.categoryName = categoryInfo.name;
+    }
+  }
 
   // build inverse (EgoPose.token -> Scene.token) map
   // and (scene.token -> calibratedSensor[]) map
@@ -146,7 +170,11 @@ MetaDataReader::loadSampleInfos(const fs::path& filePath)
     std::vector<SampleInfo>& samples =
       getExistingOrDefault(token2Samples, sceneToken);
     samples.push_back(
-      SampleInfo{ sceneToken, sampleToken, sampleInfo["timestamp"] });
+      SampleInfo{sceneToken,
+                 sampleToken,
+                 sampleInfo["timestamp"],
+                 sampleInfo["prev"]
+                 });
   }
 
   return token2Samples;
@@ -165,6 +193,7 @@ MetaDataReader::loadSampleDataInfos(const fs::path& filePath)
       getExistingOrDefault(sample2SampleData, sampleToken);
     sampleDatas.push_back(SampleDataInfo{
       sampleDataToken,
+      sampleToken,
       sampleDataJson["timestamp"],
       sampleDataJson["ego_pose_token"],
       sampleDataJson["calibrated_sensor_token"],
@@ -339,6 +368,37 @@ MetaDataReader::getEgoPoseInfo(const Token& sceneToken) const
   return findOrThrow(scene2EgoPose, sceneToken, "ego pose by scene token");
 }
 
+std::map<Token, SampleInfo>
+MetaDataReader::getSceneSamples(const Token& sceneToken) const
+{
+  std::map<Token, SampleInfo> samples;
+
+  const auto& sceneSamples = findOrThrow(scene2Samples, sceneToken, "unable to find sample for scene token");
+
+  for (const auto& sample : sceneSamples)
+  {
+    samples.insert({sample.token, sample});
+  }
+
+  return samples;
+}
+
+std::map<Token, std::vector<SampleAnnotationInfo>>
+MetaDataReader::getSceneSampleAnnotations(const Token& sceneToken) const
+{
+  std::map<Token, std::vector<SampleAnnotationInfo>> annotations;
+
+  const auto& sceneSamples = findOrThrow(scene2Samples, sceneToken, "unable to find sample for scene token");
+
+  for (const auto& sceneSample : sceneSamples) {
+    const Token& sampleToken = sceneSample.token;
+    const std::vector<SampleAnnotationInfo>& sampleAnnotations = findOrThrow(sample2SampleAnnotations, sampleToken, "unable to find sample for scene token");
+    annotations.insert({sampleToken, sampleAnnotations});
+  }
+
+  return annotations;
+}
+
 CalibratedSensorInfo
 MetaDataReader::getCalibratedSensorInfo(
   const Token& calibratedSensorToken) const
@@ -394,6 +454,86 @@ boost::shared_ptr<SceneInfo> MetaDataReader::getSceneInfoByNumber(const uint32_t
 
 #endif
 
+std::map<Token, AttributeInfo>
+MetaDataReader::loadAttributeInfo(const fs::path& filePath)
+{
+  auto attributeJsons = slurpJsonFile(filePath);
+  std::map<Token, AttributeInfo> attributeInfo;
 
+  for (const auto& json : attributeJsons)
+  {
+    attributeInfo.insert({json["token"], AttributeInfo{json["name"],
+                                                       json["description"]
+                                                       }
+                          });
+  }
+
+  return attributeInfo;
+}
+
+std::map<Token, CategoryInfo>
+MetaDataReader::loadCategories(const fs::path& filePath)
+{
+  auto categoryJsons = slurpJsonFile(filePath);
+  std::map<Token, CategoryInfo> categoryInfo;
+
+  for (const auto& json : categoryJsons)
+  {
+    categoryInfo.insert({json["token"], CategoryInfo{json["name"],
+                                                     json["description"]
+                                                     }
+                         });
+  }
+
+  return categoryInfo;
+}
+
+std::map<Token, InstanceInfo>
+MetaDataReader::loadInstances(const fs::path& filePath)
+{
+  auto instanceJsons = slurpJsonFile(filePath);
+  std::map<Token, InstanceInfo> instanceInfo;
+
+  for (const auto& json : instanceJsons)
+  {
+    instanceInfo.insert({json["token"], InstanceInfo{json["category_token"],
+                                                     json["nbr_annotations"]
+                                                     }
+                         });
+  }
+
+  return instanceInfo;
+}
+
+std::map<Token, std::vector<SampleAnnotationInfo>>
+MetaDataReader::loadSampleAnnotations(const fs::path& filePath)
+{
+  auto sampleAnnotationJsons = slurpJsonFile(filePath);
+  std::map<Token, std::vector<SampleAnnotationInfo>> sampleAnnotations;
+
+  for (const auto& json : sampleAnnotationJsons)
+  {
+    const Token sampleToken = json["sample_token"];
+    std::vector<SampleAnnotationInfo>& sampleAnnotationInfo = getExistingOrDefault(sampleAnnotations, sampleToken);
+
+    const auto translation = json["translation"];
+    const auto rotation = json["rotation"];
+    const auto size = json["size"];
+
+    sampleAnnotationInfo.push_back(SampleAnnotationInfo{json["token"],
+                                                        //json["sample_token"], // not used
+                                                        json["instance_token"],
+                                                        //json["visibility_token"], // not used
+                                                        //json["attribute_tokens"], // not used
+                                                        {translation[0], translation[1], translation[2]},
+                                                        {rotation[0], rotation[1], rotation[2], rotation[3]},
+                                                        {size[0], size[1], size[2]},
+                                                        std::string("")
+                                                        }
+                                   );
+  }
+
+  return sampleAnnotations;
+}
 
 }
