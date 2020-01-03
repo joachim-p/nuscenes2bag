@@ -29,7 +29,10 @@ find_package(catkin
 
 find_package(OpenCV REQUIRED core)
 
-add_message_files(FILES RadarObjects.msg RadarObject.msg)
+add_message_files(FILES
+                  RadarObjects.msg RadarObject.msg
+                  Boxes.msg Box.msg
+                  )
 
 generate_messages(DEPENDENCIES
                   std_msgs
