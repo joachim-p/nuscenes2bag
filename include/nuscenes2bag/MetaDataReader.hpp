@@ -48,6 +48,10 @@ public:
   getSceneSampleData(const Token &sceneToken) const override;
   std::vector<EgoPoseInfo>
   getEgoPoseInfo(const Token &sceneToken) const override;
+  std::map<Token, SampleInfo>
+  getSceneSamples(const Token& sceneToken) const override;
+  std::map<Token, std::vector<SampleAnnotationInfo>>
+  getSceneSampleAnnotations(const Token& sceneToken) const override;
   CalibratedSensorInfo
   getCalibratedSensorInfo(const Token &calibratedSensorToken) const override;
   std::vector<CalibratedSensorInfoAndName>
@@ -77,6 +81,14 @@ private:
   loadCalibratedSensorInfo(const fs::path &filePath);
   static std::map<Token, CalibratedSensorName>
   loadCalibratedSensorNames(const fs::path &filePath);
+  static std::map<Token, AttributeInfo>
+  loadAttributeInfo(const fs::path& filePath);
+  static std::map<Token, CategoryInfo>
+  loadCategories(const fs::path& filePath);
+  static std::map<Token, InstanceInfo>
+  loadInstances(const fs::path& filePath);
+  static std::map<Token, std::vector<SampleAnnotationInfo>>
+  loadSampleAnnotations(const fs::path& filePath);
 
   std::vector<SceneInfo> scenes;
   std::map<Token, std::vector<SampleInfo>> scene2Samples;
@@ -85,6 +97,10 @@ private:
   std::map<Token, CalibratedSensorInfo> calibratedSensorToken2CalibratedSensorInfo;
   std::map<Token, std::set<CalibratedSensorInfoAndName>> scene2CalibratedSensorInfo;
   std::map<Token, CalibratedSensorName> sensorToken2CalibratedSensorName;
+  std::map<Token, AttributeInfo> attributeInfo;
+  std::map<Token, CategoryInfo> categories;
+  std::map<Token, InstanceInfo> instances;
+  std::map<Token, std::vector<SampleAnnotationInfo>> sample2SampleAnnotations;
   bool loadFromDirectoryCalled = false;
 };
 
