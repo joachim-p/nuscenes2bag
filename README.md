@@ -8,6 +8,9 @@ Probably the original dataset is also collected by Aptiv using ROS, so most data
 
 ![](images/ros_preview.png)
 
+Bounding boxes in Rviz:  
+![](images/rviz_bounding_boxes.png)  
+
 ## Install
 
 The `master` branch should compile on Ubuntu 19.04. It requires C++17 and Boost 1.66.  
