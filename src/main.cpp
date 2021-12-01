@@ -39,18 +39,13 @@ main(const int argc, const char* argv[])
       std::cout << desc << '\n';
     } else {
       NuScenes2Bag converter{};
-
+      
       fs::path sampleDirPath(dataroot);
-
-#if CMAKE_CXX_STANDARD >= 17
       std::optional<int32_t> sceneNumberOpt;
       if(sceneNumber > 0) {
         sceneNumberOpt = sceneNumber;
       }
       converter.convertDirectory(sampleDirPath, version, outputBagName, threadNumber, sceneNumberOpt);
-#else
-      converter.convertDirectory(sampleDirPath, version, outputBagName, threadNumber, sceneNumber);
-#endif
 
     }
   } catch (const error& ex) {

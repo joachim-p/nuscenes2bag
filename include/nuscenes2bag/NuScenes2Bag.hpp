@@ -3,15 +3,9 @@
 #include <rosbag/bag.h>
 
 #include "nuscenes2bag/DatasetTypes.hpp"
-
-#if CMAKE_CXX_STANDARD >= 17
 #include <optional>
 #include <filesystem>
 namespace fs = std::filesystem;
-#else
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
-#endif
 
 namespace nuscenes2bag {
 
@@ -24,11 +18,7 @@ public:
                         const std::string& version,
                         const fs::path &outputRosbagPath,
                         int32_t threadNumber,
-#if CMAKE_CXX_STANDARD >= 17
                         std::optional<int32_t> sceneNumberOpt
-#else
-                        int32_t sceneNumberOpt
-#endif
                         );
 
 private:

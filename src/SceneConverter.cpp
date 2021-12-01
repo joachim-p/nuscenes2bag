@@ -22,9 +22,6 @@ SceneConverter::SceneConverter(const MetaDataProvider& metaDataProvider)
   : metaDataProvider(metaDataProvider)
 {}
 
-
-#if CMAKE_CXX_STANDARD >= 17
-
 std::optional<SampleType>
 getSampleType(const std::string_view filename)
 {
@@ -42,31 +39,6 @@ getSampleType(const std::string_view filename)
   return std::nullopt;
 }
 
-#else
-
-SampleType getSampleType(const std::string &filename)
-{
-  std::array<std::pair<const char*, SampleType>, 3> pairs = {
-    { { "CAM", SampleType::CAMERA },
-      { "RADAR", SampleType::RADAR },
-      { "LIDAR", SampleType::LIDAR } }
-  };
-  for (const auto& keyvalue : pairs) {
-    const char* str = keyvalue.first;
-    const SampleType& type = keyvalue.second;
-    if (filename.find(str) != string::npos) {
-      return type;
-    }
-  }
-  cout << "Unknown file " << filename << endl;
-
-  return SampleType::NONE;
-}
-
-#endif
-
-#if CMAKE_CXX_STANDARD >= 17
-
 template<typename T>
 void
 writeMsg(const std::string_view topicName,
@@ -83,30 +55,11 @@ writeMsg(const std::string_view topicName,
   }
 }
 
-#else
-
-template<typename T> void writeMsg(const std::string &topicName,
-                                   const std::string &frameID,
-                                   const TimeStamp timeStamp,
-                                   rosbag::Bag& outBag,
-                                   T msg)
-{
-  if (msg) {
-    msg->header.frame_id = frameID;
-    msg->header.stamp = stampUs2RosTime(timeStamp);
-    outBag.write(std::string(topicName).c_str(), msg->header.stamp, msg);
-  }
-}
-
-#endif
-
 static const std::regex TOPIC_REGEX = std::regex(".*__([A-Z_]+)__.*");
 
 void
 SceneConverter::submit(const Token& sceneToken, FileProgress& fileProgress)
 {
-
-#if CMAKE_CXX_STANDARD >= 17
   std::optional sceneInfoOpt = metaDataProvider.getSceneInfo(sceneToken);
   // if(!sceneInfoOpt.has_value()) {
   //     // cout << "SceneInfo for " << sceneToken << " not found!" << endl;
@@ -114,11 +67,6 @@ SceneConverter::submit(const Token& sceneToken, FileProgress& fileProgress)
   // }
   assert(sceneInfoOpt.has_value());
   SceneInfo& sceneInfo = sceneInfoOpt.value();
-#else
-  boost::shared_ptr<SceneInfo> sceneInfoPtr = metaDataProvider.getSceneInfo(sceneToken);
-  assert(sceneInfoPtr != nullptr);
-  SceneInfo& sceneInfo = *sceneInfoPtr;
-#endif
 
   sceneId = sceneInfo.sceneId;
   this->sceneToken = sceneToken;
@@ -156,17 +104,13 @@ SceneConverter::convertSampleDatas(rosbag::Bag& outBag,
                                    FileProgress& fileProgress)
 {
   for (const auto& sampleData : sampleDatas) {
-    fs::path sampleFilePath = inPath / sampleData.fileName;
 
-#if CMAKE_CXX_STANDARD >= 17
+    fs::path sampleFilePath = inPath / sampleData.fileName;
     std::optional<SampleType> sampleTypeOpt = getSampleType(sampleFilePath.string());
     if (!sampleTypeOpt.has_value()) {
       continue;
     }
     SampleType& sampleType = sampleTypeOpt.value();
-#else
-    SampleType sampleType = getSampleType(sampleFilePath.string());
-#endif
 
     CalibratedSensorInfo calibratedSensorInfo =
       metaDataProvider.getCalibratedSensorInfo(
@@ -284,15 +228,11 @@ SceneConverter::convertAnnotations(rosbag::Bag& outBag) // SampleType& sensorTyp
 
   for (const auto& sampleData : sampleDatas) {
 
-#if CMAKE_CXX_STANDARD >= 17
     std::optional<SampleType> sampleTypeOpt = getSampleType(sampleData.fileName);
     if (!sampleTypeOpt.has_value()) {
       continue;
     }
     SampleType& sampleType = sampleTypeOpt.value();
-#else
-    SampleType sampleType = getSampleType(sampleData.fileName);
-#endif
 
     CalibratedSensorInfo calibratedSensorInfo =
       metaDataProvider.getCalibratedSensorInfo(

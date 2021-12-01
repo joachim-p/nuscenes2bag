@@ -1,14 +1,8 @@
 #include <iostream>
 #include <map>
 #include <set>
-
-#if CMAKE_CXX_STANDARD >= 17
 #include <filesystem>
 namespace fs = std::filesystem;
-#else
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
-#endif
 
 #include <nlohmann/json.hpp>
 
@@ -38,11 +32,7 @@ public:
 
   std::vector<Token> getAllSceneTokens() const override;
 
-#if CMAKE_CXX_STANDARD >= 17
   std::optional<SceneInfo> getSceneInfo(const Token &sceneToken) const override;
-#else
-  boost::shared_ptr<SceneInfo> getSceneInfo(const Token &sceneToken) const override;
-#endif
 
   std::vector<SampleDataInfo>
   getSceneSampleData(const Token &sceneToken) const override;
@@ -59,12 +49,8 @@ public:
   CalibratedSensorName
   getSensorName(const Token &sensorToken) const override;
 
-#if CMAKE_CXX_STANDARD >= 17
   std::optional<SceneInfo>
   getSceneInfoByNumber(const uint32_t sceneNumber) const override;
-#else
-  boost::shared_ptr<SceneInfo> getSceneInfoByNumber(const uint32_t sceneNumber) const override;
-#endif
 
 private:
   static nlohmann::json slurpJsonFile(const fs::path &filePath);

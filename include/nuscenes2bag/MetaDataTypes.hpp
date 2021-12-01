@@ -3,10 +3,7 @@
 #include <string>
 #include <array>
 #include <vector>
-
-#if CMAKE_CXX_STANDARD >= 17
 #include <optional>
-#endif
 
 #include "nuscenes2bag/ToDebugString.hpp"
 #include "nuscenes2bag/DatasetTypes.hpp"
@@ -87,11 +84,7 @@ struct CalibratedSensorInfo {
     Token sensorToken;
     double translation[3];
     double rotation[4];
-#if CMAKE_CXX_STANDARD >= 17
     std::optional<IntrinsicsMatrix> cameraIntrinsics;
-#else
-    IntrinsicsMatrix cameraIntrinsics;
-#endif
 };
 
 struct CalibratedSensorName {
