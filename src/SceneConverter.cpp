@@ -253,7 +253,7 @@ SceneConverter::convertAnnotations(rosbag::Bag& outBag) // SampleType& sensorTyp
       boxesMsg.boxes = boxes;
       outBag.write("boxes", timestamp, boxesMsg);
 
-      const ros::Duration lifetime(1.0/25.0); // Annotations are 25Hz
+      const ros::Duration lifetime(0); // Annotations are 25Hz
       visualization_msgs::MarkerArray boxesVizMsg = makeMarkerArrayMsg(boxes, timestamp, lifetime);
       outBag.write("boxes_viz", timestamp, boxesVizMsg);
     }
@@ -402,7 +402,7 @@ Box makeBox(const SampleAnnotationInfo& annotation)
   boxMsg.orientation.y = static_cast<double>(annotation.rotation[2]);
   boxMsg.orientation.z = static_cast<double>(annotation.rotation[3]);
 
-  boxMsg.token = annotation.token;
+  boxMsg.token = annotation.instanceToken;
 
   boxMsg.category_name = annotation.categoryName;
   boxMsg.color = getColor(annotation.categoryName);
@@ -427,7 +427,7 @@ Box makeBox(const SampleAnnotationInfo& annotation, const Eigen::Vector3d& cente
   boxMsg.orientation.z = rotation.z();
   boxMsg.orientation.w = rotation.w();
 
-  boxMsg.token = annotation.token;
+  boxMsg.token = annotation.instanceToken;
 
   boxMsg.category_name = annotation.categoryName;
   boxMsg.color = getColor(annotation.categoryName);
@@ -681,6 +681,11 @@ visualization_msgs::MarkerArray makeMarkerArrayMsg(const std::vector<Box>& boxes
 {
   visualization_msgs::MarkerArray markerArrayMsg;
   unsigned int id = 0;
+
+  // first msg must be delete all to remove rviz flickering
+  visualization_msgs::Marker clear;
+  clear.action = visualization_msgs::Marker::DELETEALL;
+  markerArrayMsg.markers.push_back(clear);
 
   for (const auto& box : boxes)
   {
