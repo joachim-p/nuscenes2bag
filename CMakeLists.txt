@@ -25,6 +25,7 @@ find_package(catkin
              geometry_msgs
              std_msgs
              nav_msgs
+             jsk_recognition_msgs
              tf)
 
 find_package(OpenCV REQUIRED core)

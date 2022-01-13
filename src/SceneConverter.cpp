@@ -253,8 +253,7 @@ SceneConverter::convertAnnotations(rosbag::Bag& outBag) // SampleType& sensorTyp
       boxesMsg.boxes = boxes;
       outBag.write("boxes", timestamp, boxesMsg);
 
-      const ros::Duration lifetime(0); // Annotations are 25Hz
-      visualization_msgs::MarkerArray boxesVizMsg = makeMarkerArrayMsg(boxes, timestamp, lifetime);
+      jsk_recognition_msgs::BoundingBoxArray boxesVizMsg = makeVisualizationMsg(boxes, timestamp);
       outBag.write("boxes_viz", timestamp, boxesVizMsg);
     }
   }
@@ -374,7 +373,16 @@ SceneConverter::getBoxes(const SampleDataInfo& sampleData, std::vector<Box>& box
         const Eigen::Quaterniond q1 = makeQuaterniond(annotation.rotation);
         const Eigen::Quaterniond rotation = q0.slerp(amount, q1);
 
-        boxes.push_back(makeBox(annotation, center, rotation));
+        auto box = makeBox(annotation);
+        box.center.x = center.x();
+        box.center.y = center.y();
+        box.center.z = center.z();
+        box.orientation.x = rotation.x();
+        box.orientation.y = rotation.y();
+        box.orientation.z = rotation.z();
+        box.orientation.w = rotation.w();
+
+        boxes.push_back(box);
       }
     }
   }
@@ -393,8 +401,8 @@ Box makeBox(const SampleAnnotationInfo& annotation)
   boxMsg.center.y = static_cast<double>(annotation.translation[1]);
   boxMsg.center.z = static_cast<double>(annotation.translation[2]);
 
-  boxMsg.size.x = static_cast<double>(annotation.size[0]);
-  boxMsg.size.y = static_cast<double>(annotation.size[1]);
+  boxMsg.size.x = static_cast<double>(annotation.size[1]);
+  boxMsg.size.y = static_cast<double>(annotation.size[0]);
   boxMsg.size.z = static_cast<double>(annotation.size[2]);
 
   boxMsg.orientation.w = static_cast<double>(annotation.rotation[0]);
@@ -402,35 +410,11 @@ Box makeBox(const SampleAnnotationInfo& annotation)
   boxMsg.orientation.y = static_cast<double>(annotation.rotation[2]);
   boxMsg.orientation.z = static_cast<double>(annotation.rotation[3]);
 
-  boxMsg.token = annotation.instanceToken;
-
-  boxMsg.category_name = annotation.categoryName;
-  boxMsg.color = getColor(annotation.categoryName);
-
-  return boxMsg;
-}
-
-Box makeBox(const SampleAnnotationInfo& annotation, const Eigen::Vector3d& center, const Eigen::Quaterniond& rotation)
-{
-  Box boxMsg;
-
-  boxMsg.center.x = center.x();
-  boxMsg.center.y = center.y();
-  boxMsg.center.z = center.z();
-
-  boxMsg.size.x = static_cast<double>(annotation.size[0]);
-  boxMsg.size.y = static_cast<double>(annotation.size[1]);
-  boxMsg.size.z = static_cast<double>(annotation.size[2]);
-
-  boxMsg.orientation.x = rotation.x();
-  boxMsg.orientation.y = rotation.y();
-  boxMsg.orientation.z = rotation.z();
-  boxMsg.orientation.w = rotation.w();
+  boxMsg.label = 0;
 
   boxMsg.token = annotation.instanceToken;
 
   boxMsg.category_name = annotation.categoryName;
-  boxMsg.color = getColor(annotation.categoryName);
 
   return boxMsg;
 }
@@ -452,235 +436,37 @@ inline bool stringContains(const std::string& str, const std::string& substr)
   return false;
 }
 
-std_msgs::ColorRGBA getColor(const std::string& categoryName)
+jsk_recognition_msgs::BoundingBox makeVisualizationMsg(const Box& box, const ros::Time& timestamp)
 {
-  std_msgs::ColorRGBA color;
-
-  if (stringContains(categoryName, "bicycle")) {
-    // Red
-    color.r = 1.0; // 255
-    color.g = 0.239; // 61
-    color.b = 0.388; // 99
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "motorcycle")) {
-    // Red
-    color.r = 1.0; // 255
-    color.g = 0.239; // 61
-    color.b = 0.388; // 99
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "vehicle")) {
-    // Orange
-    color.r = 1.0; // 255
-    color.g = 0.619; // 158
-    color.b = 0.0; // 0
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "bus")) {
-    // Orange
-    color.r = 1.0; // 255
-    color.g = 0.619; // 158
-    color.b = 0.0; // 0
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "car")) {
-    // Orange
-    color.r = 1.0; // 255
-    color.g = 0.619; // 158
-    color.b = 0.0; // 0
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "construction_vehicle")) {
-    // Orange
-    color.r = 1.0; // 255
-    color.g = 0.619; // 158
-    color.b = 0.0; // 0
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "trailer")) {
-    // Orange
-    color.r = 1.0; // 255
-    color.g = 0.619; // 158
-    color.b = 0.0; // 0
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "truck")) {
-    // Orange
-    color.r = 1.0; // 255
-    color.g = 0.619; // 158
-    color.b = 0.0; // 0
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "pedestrian")) {
-    // Blue
-    color.r = 0.0; // 0
-    color.g = 0.0; // 0
-    color.b = 0.901; // 230
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "cone")) {
-    // Black
-    color.r = 0.0; // 0
-    color.g = 0.0; // 0
-    color.b = 0.0; // 0
-    color.a = 1.0;
-    return color;
-  }
-  else if (stringContains(categoryName, "barrier")) {
-    // Black
-    color.r = 0.0; // 0
-    color.g = 0.0; // 0
-    color.b = 0.0; // 0
-    color.a = 1.0;
-    return color;
-  }
-
-  // Magenta
-  color.r = 1.0; // 255
-  color.g = 0.0; // 0
-  color.b = 1.0; // 255
-  color.a = 1.0;
-  return color;
-}
-
-visualization_msgs::Marker makeMarkerMsg(const Box& box, const int32_t id, const ros::Time& timestamp, const ros::Duration& lifetime)
-{
-  const double lineWidth = 0.1;
-
-  const Eigen::Affine3d pose =
-      Eigen::Translation3d(box.center.x, box.center.y, box.center.z)
-      * Eigen::Quaterniond(box.orientation.w, box.orientation.x, box.orientation.y, box.orientation.z);
-
-  const double width = box.size.x; // width is along x-axis
-  const double depth = box.size.y;
-  const double height = box.size.z;
-
-  const Eigen::Vector3d minPoint(-depth / 2.0, -width / 2.0, -height / 2.0);
-  const Eigen::Vector3d maxPoint(depth / 2.0, width / 2.0, height / 2.0);
-
-  Eigen::Vector3d p1(minPoint[0], minPoint[1], minPoint[2]);
-  Eigen::Vector3d p2(minPoint[0], minPoint[1], maxPoint[2]);
-  Eigen::Vector3d p3(maxPoint[0], minPoint[1], maxPoint[2]);
-  Eigen::Vector3d p4(maxPoint[0], minPoint[1], minPoint[2]);
-  Eigen::Vector3d p5(minPoint[0], maxPoint[1], minPoint[2]);
-  Eigen::Vector3d p6(minPoint[0], maxPoint[1], maxPoint[2]);
-  Eigen::Vector3d p7(maxPoint[0], maxPoint[1], maxPoint[2]);
-  Eigen::Vector3d p8(maxPoint[0], maxPoint[1], minPoint[2]);
-
-  p1 = pose * p1;
-  p2 = pose * p2;
-  p3 = pose * p3;
-  p4 = pose * p4;
-  p5 = pose * p5;
-  p6 = pose * p6;
-  p7 = pose * p7;
-  p8 = pose * p8;
-
-  visualization_msgs::Marker msg;
-  msg.type = visualization_msgs::Marker::LINE_LIST;
-  msg.action = visualization_msgs::Marker::ADD;
+  jsk_recognition_msgs::BoundingBox msg;
 
   msg.header.frame_id = "map";
-  msg.ns = "annotations";
-  msg.id = id;
   msg.header.stamp = timestamp;
-  msg.lifetime = lifetime;
 
-  msg.pose.position.x = 0.0;
-  msg.pose.position.y = 0.0;
-  msg.pose.position.z = 0.0;
-  msg.pose.orientation.x = 0.0;
-  msg.pose.orientation.y = 0.0;
-  msg.pose.orientation.z = 0.0;
-  msg.pose.orientation.w = 1.0;
+  msg.pose.position.x = box.center.x;
+  msg.pose.position.y = box.center.y;
+  msg.pose.position.z = box.center.z;
+  
+  msg.pose.orientation.x = box.orientation.x;
+  msg.pose.orientation.y = box.orientation.y;
+  msg.pose.orientation.z = box.orientation.z;
+  msg.pose.orientation.w = box.orientation.w;
 
-  msg.scale.x = lineWidth; // The line width for LINE_LIST
+  msg.dimensions.x = box.size.x;
+  msg.dimensions.y = box.size.y;
+  msg.dimensions.z = box.size.z;
 
-  std_msgs::ColorRGBA color = box.color;
-
-  msg.color = color;
-  msg.points.clear();
-  msg.colors.clear();
-
-  // A LINE_LIST is a set of unconnected lines:
-
-  msg.points.push_back(makePointMsg(p1));
-  msg.points.push_back(makePointMsg(p2));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p1));
-  msg.points.push_back(makePointMsg(p4));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p1));
-  msg.points.push_back(makePointMsg(p5));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p5));
-  msg.points.push_back(makePointMsg(p6));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p5));
-  msg.points.push_back(makePointMsg(p8));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p2));
-  msg.points.push_back(makePointMsg(p6));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p6));
-  msg.points.push_back(makePointMsg(p7));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p7));
-  msg.points.push_back(makePointMsg(p8));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p2));
-  msg.points.push_back(makePointMsg(p3));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p4));
-  msg.points.push_back(makePointMsg(p8));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p3));
-  msg.points.push_back(makePointMsg(p4));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
-
-  msg.points.push_back(makePointMsg(p3));
-  msg.points.push_back(makePointMsg(p7));
-  msg.colors.push_back(color);
-  msg.colors.push_back(color);
+  msg.value = 1.0; // labels are always correct
+  msg.label = box.label;
 
   return msg;
 }
 
-visualization_msgs::MarkerArray makeMarkerArrayMsg(const std::vector<Box>& boxes, const ros::Time& timestamp, const ros::Duration& lifetime)
+jsk_recognition_msgs::BoundingBoxArray makeVisualizationMsg(const std::vector<Box>& boxes, const ros::Time& timestamp)
 {
-  visualization_msgs::MarkerArray markerArrayMsg;
-  unsigned int id = 0;
+  jsk_recognition_msgs::BoundingBoxArray msg;
+  msg.header.frame_id = "map";
+  msg.header.stamp = timestamp;
 
   // first msg must be delete all to remove rviz flickering
   visualization_msgs::Marker clear;
@@ -689,11 +475,10 @@ visualization_msgs::MarkerArray makeMarkerArrayMsg(const std::vector<Box>& boxes
 
   for (const auto& box : boxes)
   {
-    markerArrayMsg.markers.push_back(makeMarkerMsg(box, id, timestamp, lifetime));
-    id++;
+    msg.boxes.push_back(makeVisualizationMsg(box, timestamp));
   }
 
-  return markerArrayMsg;
+  return msg;
 }
 
 }
