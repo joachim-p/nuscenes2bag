@@ -14,8 +14,7 @@ namespace fs = boost::filesystem;
 
 #include "rosbag/bag.h"
 #include <geometry_msgs/Point.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
+#include <jsk_recognition_msgs/BoundingBoxArray.h>
 
 #include <Eigen/Dense>
 
@@ -48,13 +47,9 @@ class SceneConverter {
 Eigen::Vector3d lerp(const double t, const Eigen::Vector3d& p0, const Eigen::Vector3d& p1);
 
 Box makeBox(const SampleAnnotationInfo& annotation);
-Box makeBox(const SampleAnnotationInfo& annotation, const Eigen::Vector3d& center, const Eigen::Quaterniond& rotation);
 
 geometry_msgs::Point makePointMsg(const Eigen::Vector3d& point);
 
-// Provides the default colors based on the category names
-std_msgs::ColorRGBA getColor(const std::string& categoryName);
-
-visualization_msgs::Marker makeMarkerMsg(const Box& box, const int32_t id, const ros::Time& timestamp, const ros::Duration& lifetime);
-visualization_msgs::MarkerArray makeMarkerArrayMsg(const std::vector<Box>& boxes, const ros::Time& timestamp, const ros::Duration& lifetime);
+jsk_recognition_msgs::BoundingBox makeVisualizationMsg(const Box& box, const ros::Time& timestamp);
+jsk_recognition_msgs::BoundingBoxArray makeVisualizationMsg(const std::vector<Box>& boxes, const ros::Time& timestamp);
 }

@@ -75,9 +75,9 @@ struct SampleAnnotationInfo {
     Token instanceToken;
     //Token visibilityToken;
     //std::vector<Token> attributeTokens;
-    float translation[3];
-    float rotation[4];
-    float size[3];
+    float translation[3]; // x, y, z
+    float rotation[4]; // w, x, y, z
+    float size[3]; // width, length, height
     std::string categoryName;
     //std::vector<Token> anns;
 };

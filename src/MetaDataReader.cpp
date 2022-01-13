@@ -528,7 +528,7 @@ MetaDataReader::loadSampleAnnotations(const fs::path& filePath)
                                                         {translation[0], translation[1], translation[2]},
                                                         {rotation[0], rotation[1], rotation[2], rotation[3]},
                                                         {size[0], size[1], size[2]},
-                                                        std::string("")
+                                                        std::string("") // category name
                                                         }
                                    );
   }
