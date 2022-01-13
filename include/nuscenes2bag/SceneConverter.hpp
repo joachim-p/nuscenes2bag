@@ -5,7 +5,7 @@ namespace fs = std::filesystem;
 
 #include "nuscenes2bag/MetaDataReader.hpp"
 #include "nuscenes2bag/FileProgress.hpp"
-#include "nuscenes2bag/Boxes.h"
+#include "nuscenes2bag/Labels.h"
 
 #include "rosbag/bag.h"
 #include <geometry_msgs/Point.h>
@@ -27,7 +27,7 @@ class SceneConverter {
     void convertSampleDatas(rosbag::Bag& outBag, const fs::path &inPath, FileProgress& fileProgress);
     void convertEgoPoseInfos(rosbag::Bag& outBag, const std::vector<CalibratedSensorInfoAndName>& calibratedSensorInfo);
     void convertAnnotations(rosbag::Bag& outBag);
-    void getBoxes(const SampleDataInfo& sampleData, std::vector<Box>& boxes);
+    void getLabels(const SampleDataInfo& sampleData, std::vector<Label>& labels);
 
     private:
     const MetaDataProvider& metaDataProvider;
@@ -41,10 +41,10 @@ class SceneConverter {
 
 Eigen::Vector3d lerp(const double t, const Eigen::Vector3d& p0, const Eigen::Vector3d& p1);
 
-Box makeBox(const SampleAnnotationInfo& annotation);
+Label makeLabel(const SampleAnnotationInfo& annotation);
 
 geometry_msgs::Point makePointMsg(const Eigen::Vector3d& point);
 
-jsk_recognition_msgs::BoundingBox makeVisualizationMsg(const Box& box, const ros::Time& timestamp);
-jsk_recognition_msgs::BoundingBoxArray makeVisualizationMsg(const std::vector<Box>& boxes, const ros::Time& timestamp);
+jsk_recognition_msgs::BoundingBox makeVisualizationMsg(const Label& label, const ros::Time& timestamp);
+jsk_recognition_msgs::BoundingBoxArray makeVisualizationMsg(const std::vector<Label>& labels, const ros::Time& timestamp);
 }

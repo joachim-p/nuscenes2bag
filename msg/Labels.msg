@@ -1,2 +1,2 @@
 std_msgs/Header header
-Box[] boxes
+Label[] labels

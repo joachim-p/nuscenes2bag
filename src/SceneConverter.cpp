@@ -242,19 +242,19 @@ SceneConverter::convertAnnotations(rosbag::Bag& outBag) // SampleType& sensorTyp
     std::string sensorName = toLower(calibratedSensorName.name);
 
     if (sampleType == SampleType::LIDAR) {
-      std::vector<Box> boxes;
-      getBoxes(sampleData, boxes);
+      std::vector<Label> labels;
+      getLabels(sampleData, labels);
 
       const ros::Time& timestamp = stampUs2RosTime(sampleData.timeStamp);
 
-      Boxes boxesMsg;
-      boxesMsg.header.stamp = timestamp;
-      boxesMsg.header.frame_id = "map";
-      boxesMsg.boxes = boxes;
-      outBag.write("boxes", timestamp, boxesMsg);
+      Labels labelsMsg;
+      labelsMsg.header.stamp = timestamp;
+      labelsMsg.header.frame_id = "map";
+      labelsMsg.labels = labels;
+      outBag.write("labels", timestamp, labelsMsg);
 
-      jsk_recognition_msgs::BoundingBoxArray boxesVizMsg = makeVisualizationMsg(boxes, timestamp);
-      outBag.write("boxes_viz", timestamp, boxesVizMsg);
+      jsk_recognition_msgs::BoundingBoxArray labelsVizMsg = makeVisualizationMsg(labels, timestamp);
+      outBag.write("labels_viz", timestamp, labelsVizMsg);
     }
   }
 }
@@ -265,7 +265,7 @@ Eigen::Quaterniond makeQuaterniond(const float* rotation)
 }
 
 void
-SceneConverter::getBoxes(const SampleDataInfo& sampleData, std::vector<Box>& boxes)
+SceneConverter::getLabels(const SampleDataInfo& sampleData, std::vector<Label>& labels)
 {
   const Token& currSampleToken = sampleData.sampleToken;
 
@@ -295,13 +295,13 @@ SceneConverter::getBoxes(const SampleDataInfo& sampleData, std::vector<Box>& box
 
     for (const auto& annotation: annotations)
     {
-      boxes.push_back(makeBox(annotation));
+      labels.push_back(makeLabel(annotation));
     }
 
     return;
   }
   else {
-    // Sample data is intermediate, use linear interpolation to estimate position of boxes
+    // Sample data is intermediate, use linear interpolation to estimate position of labels
 
     SampleInfo prevSample;
     {
@@ -352,7 +352,7 @@ SceneConverter::getBoxes(const SampleDataInfo& sampleData, std::vector<Box>& box
       auto it = prevInstanceMap.find(annotation.instanceToken);
       if (it == prevInstanceMap.end()) {
         // The instance does not exist in the previous frame so get the current annotation.
-        boxes.push_back(makeBox(annotation));
+        labels.push_back(makeLabel(annotation));
       }
       else {
         // The annotated instance existed in the previous frame, therefore interpolate center & orientation.
@@ -373,16 +373,16 @@ SceneConverter::getBoxes(const SampleDataInfo& sampleData, std::vector<Box>& box
         const Eigen::Quaterniond q1 = makeQuaterniond(annotation.rotation);
         const Eigen::Quaterniond rotation = q0.slerp(amount, q1);
 
-        auto box = makeBox(annotation);
-        box.center.x = center.x();
-        box.center.y = center.y();
-        box.center.z = center.z();
-        box.orientation.x = rotation.x();
-        box.orientation.y = rotation.y();
-        box.orientation.z = rotation.z();
-        box.orientation.w = rotation.w();
+        auto label = makeLabel(annotation);
+        label.center.x = center.x();
+        label.center.y = center.y();
+        label.center.z = center.z();
+        label.orientation.x = rotation.x();
+        label.orientation.y = rotation.y();
+        label.orientation.z = rotation.z();
+        label.orientation.w = rotation.w();
 
-        boxes.push_back(box);
+        labels.push_back(label);
       }
     }
   }
@@ -392,31 +392,31 @@ Eigen::Vector3d lerp(const double t, const Eigen::Vector3d& p0, const Eigen::Vec
   return t*p0 + (1.0 - t)*p1;
 }
 
-Box makeBox(const SampleAnnotationInfo& annotation)
+Label makeLabel(const SampleAnnotationInfo& annotation)
 {
-  Box boxMsg;
+  Label labelMsg;
 
   // NuScenes data is stored as float but ROS uses double
-  boxMsg.center.x = static_cast<double>(annotation.translation[0]);
-  boxMsg.center.y = static_cast<double>(annotation.translation[1]);
-  boxMsg.center.z = static_cast<double>(annotation.translation[2]);
+  labelMsg.center.x = static_cast<double>(annotation.translation[0]);
+  labelMsg.center.y = static_cast<double>(annotation.translation[1]);
+  labelMsg.center.z = static_cast<double>(annotation.translation[2]);
 
-  boxMsg.size.x = static_cast<double>(annotation.size[1]);
-  boxMsg.size.y = static_cast<double>(annotation.size[0]);
-  boxMsg.size.z = static_cast<double>(annotation.size[2]);
+  labelMsg.size.x = static_cast<double>(annotation.size[1]);
+  labelMsg.size.y = static_cast<double>(annotation.size[0]);
+  labelMsg.size.z = static_cast<double>(annotation.size[2]);
 
-  boxMsg.orientation.w = static_cast<double>(annotation.rotation[0]);
-  boxMsg.orientation.x = static_cast<double>(annotation.rotation[1]);
-  boxMsg.orientation.y = static_cast<double>(annotation.rotation[2]);
-  boxMsg.orientation.z = static_cast<double>(annotation.rotation[3]);
+  labelMsg.orientation.w = static_cast<double>(annotation.rotation[0]);
+  labelMsg.orientation.x = static_cast<double>(annotation.rotation[1]);
+  labelMsg.orientation.y = static_cast<double>(annotation.rotation[2]);
+  labelMsg.orientation.z = static_cast<double>(annotation.rotation[3]);
 
-  boxMsg.label = 0;
+  labelMsg.label = 0;
 
-  boxMsg.token = annotation.instanceToken;
+  labelMsg.token = annotation.instanceToken;
 
-  boxMsg.category_name = annotation.categoryName;
+  labelMsg.category_name = annotation.categoryName;
 
-  return boxMsg;
+  return labelMsg;
 }
 
 geometry_msgs::Point makePointMsg(const Eigen::Vector3d& point)
@@ -436,46 +436,41 @@ inline bool stringContains(const std::string& str, const std::string& substr)
   return false;
 }
 
-jsk_recognition_msgs::BoundingBox makeVisualizationMsg(const Box& box, const ros::Time& timestamp)
+jsk_recognition_msgs::BoundingBox makeVisualizationMsg(const Label& label, const ros::Time& timestamp)
 {
   jsk_recognition_msgs::BoundingBox msg;
 
   msg.header.frame_id = "map";
   msg.header.stamp = timestamp;
 
-  msg.pose.position.x = box.center.x;
-  msg.pose.position.y = box.center.y;
-  msg.pose.position.z = box.center.z;
+  msg.pose.position.x = label.center.x;
+  msg.pose.position.y = label.center.y;
+  msg.pose.position.z = label.center.z;
   
-  msg.pose.orientation.x = box.orientation.x;
-  msg.pose.orientation.y = box.orientation.y;
-  msg.pose.orientation.z = box.orientation.z;
-  msg.pose.orientation.w = box.orientation.w;
+  msg.pose.orientation.x = label.orientation.x;
+  msg.pose.orientation.y = label.orientation.y;
+  msg.pose.orientation.z = label.orientation.z;
+  msg.pose.orientation.w = label.orientation.w;
 
-  msg.dimensions.x = box.size.x;
-  msg.dimensions.y = box.size.y;
-  msg.dimensions.z = box.size.z;
+  msg.dimensions.x = label.size.x;
+  msg.dimensions.y = label.size.y;
+  msg.dimensions.z = label.size.z;
 
   msg.value = 1.0; // labels are always correct
-  msg.label = box.label;
+  msg.label = label.label;
 
   return msg;
 }
 
-jsk_recognition_msgs::BoundingBoxArray makeVisualizationMsg(const std::vector<Box>& boxes, const ros::Time& timestamp)
+jsk_recognition_msgs::BoundingBoxArray makeVisualizationMsg(const std::vector<Label>& labels, const ros::Time& timestamp)
 {
   jsk_recognition_msgs::BoundingBoxArray msg;
   msg.header.frame_id = "map";
   msg.header.stamp = timestamp;
 
-  // first msg must be delete all to remove rviz flickering
-  visualization_msgs::Marker clear;
-  clear.action = visualization_msgs::Marker::DELETEALL;
-  markerArrayMsg.markers.push_back(clear);
-
-  for (const auto& box : boxes)
+  for (const auto& label : labels)
   {
-    msg.boxes.push_back(makeVisualizationMsg(box, timestamp));
+    msg.boxes.push_back(makeVisualizationMsg(label, timestamp));
   }
 
   return msg;

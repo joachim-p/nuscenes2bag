@@ -32,7 +32,7 @@ find_package(OpenCV REQUIRED core)
 
 add_message_files(FILES
                   RadarObjects.msg RadarObject.msg
-                  Boxes.msg Box.msg
+                  Labels.msg Label.msg
                   )
 
 generate_messages(DEPENDENCIES
