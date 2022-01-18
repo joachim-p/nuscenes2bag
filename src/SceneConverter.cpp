@@ -241,11 +241,19 @@ SceneConverter::convertAnnotations(rosbag::Bag& outBag) // SampleType& sensorTyp
       metaDataProvider.getSensorName(calibratedSensorInfo.sensorToken);
     std::string sensorName = toLower(calibratedSensorName.name);
 
+    const ros::Time& timestamp = stampUs2RosTime(sampleData.timeStamp);
+
+    // output sample token msg
+    SampleToken msg;
+    msg.stamp = timestamp;
+    msg.sample_token = sampleData.sampleToken;
+    msg.is_key_frame = sampleData.isKeyFrame;
+    outBag.write("sample_token", timestamp, msg);
+
+    // output lidar sweep
     if (sampleType == SampleType::LIDAR) {
       std::vector<Label> labels;
       getLabels(sampleData, labels);
-
-      const ros::Time& timestamp = stampUs2RosTime(sampleData.timeStamp);
 
       Labels labelsMsg;
       labelsMsg.header.stamp = timestamp;

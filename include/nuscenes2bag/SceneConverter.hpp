@@ -6,6 +6,7 @@ namespace fs = std::filesystem;
 #include "nuscenes2bag/MetaDataReader.hpp"
 #include "nuscenes2bag/FileProgress.hpp"
 #include "nuscenes2bag/Labels.h"
+#include "nuscenes2bag/SampleToken.h"
 
 #include "rosbag/bag.h"
 #include <geometry_msgs/Point.h>

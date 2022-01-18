@@ -33,6 +33,7 @@ find_package(OpenCV REQUIRED core)
 add_message_files(FILES
                   RadarObjects.msg RadarObject.msg
                   Labels.msg Label.msg
+                  SampleToken.msg
                   )
 
 generate_messages(DEPENDENCIES
