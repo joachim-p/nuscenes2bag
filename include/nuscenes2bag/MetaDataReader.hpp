@@ -29,11 +29,13 @@ class MetaDataReader : public MetaDataProvider {
 public:
   void loadFromDirectory(const fs::path &directoryPath);
 
-
   std::vector<Token> getAllSceneTokens() const override;
 
-  std::optional<SceneInfo> getSceneInfo(const Token &sceneToken) const override;
-
+  // scene related
+  std::optional<SceneInfo>
+  getSceneInfo(const Token &sceneToken) const override;
+  std::optional<SceneInfo>
+  getSceneInfoByNumber(const uint32_t sceneNumber) const override;
   std::vector<SampleDataInfo>
   getSceneSampleData(const Token &sceneToken) const override;
   std::vector<EgoPoseInfo>
@@ -42,15 +44,17 @@ public:
   getSceneSamples(const Token& sceneToken) const override;
   std::map<Token, std::vector<SampleAnnotationInfo>>
   getSceneSampleAnnotations(const Token& sceneToken) const override;
-  CalibratedSensorInfo
-  getCalibratedSensorInfo(const Token &calibratedSensorToken) const override;
   std::vector<CalibratedSensorInfoAndName>
   getSceneCalibratedSensorInfo(const Token &sceneToken) const override;
+
+  // general
+  const std::map<Token, InstanceInfo>& getInstanceInfo() const override;
+  const std::map<Token, AttributeInfo>& getAttributeInfo() const override;
+  const std::map<Token, CategoryInfo>& getCategoryInfo() const override;
+  CalibratedSensorInfo getCalibratedSensorInfo(
+    const Token& calibratedSensorToken) const override;
   CalibratedSensorName
   getSensorName(const Token &sensorToken) const override;
-
-  std::optional<SceneInfo>
-  getSceneInfoByNumber(const uint32_t sceneNumber) const override;
 
 private:
   static nlohmann::json slurpJsonFile(const fs::path &filePath);
@@ -70,9 +74,9 @@ private:
   static std::map<Token, AttributeInfo>
   loadAttributeInfo(const fs::path& filePath);
   static std::map<Token, CategoryInfo>
-  loadCategories(const fs::path& filePath);
+  loadCategoryInfo(const fs::path& filePath);
   static std::map<Token, InstanceInfo>
-  loadInstances(const fs::path& filePath);
+  loadInstanceInfo(const fs::path& filePath);
   static std::map<Token, std::vector<SampleAnnotationInfo>>
   loadSampleAnnotations(const fs::path& filePath);
 
@@ -83,7 +87,7 @@ private:
   std::map<Token, CalibratedSensorInfo> calibratedSensorToken2CalibratedSensorInfo;
   std::map<Token, std::set<CalibratedSensorInfoAndName>> scene2CalibratedSensorInfo;
   std::map<Token, CalibratedSensorName> sensorToken2CalibratedSensorName;
-  std::map<Token, AttributeInfo> attributeInfo;
+  std::map<Token, AttributeInfo> attributes;
   std::map<Token, CategoryInfo> categories;
   std::map<Token, InstanceInfo> instances;
   std::map<Token, std::vector<SampleAnnotationInfo>> sample2SampleAnnotations;

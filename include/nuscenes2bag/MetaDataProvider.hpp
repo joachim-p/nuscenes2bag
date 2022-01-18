@@ -29,6 +29,9 @@ public:
     const Token& sceneToken) const = 0;
   virtual CalibratedSensorName getSensorName(
     const Token& sensorToken) const = 0;
+  virtual const std::map<Token, InstanceInfo>& getInstanceInfo() const = 0;
+  virtual const std::map<Token, AttributeInfo>& getAttributeInfo() const = 0;
+  virtual const std::map<Token, CategoryInfo>& getCategoryInfo() const = 0;
 };
 
 }

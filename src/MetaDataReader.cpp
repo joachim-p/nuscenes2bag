@@ -50,6 +50,7 @@ MetaDataReader::loadFromDirectory(const fs::path& directoryPath)
   const fs::path sensorFile = directoryPath / "sensor.json";
   const fs::path categoryFile = directoryPath / "category.json";
   const fs::path instanceFile = directoryPath / "instance.json";
+  const fs::path attributeFile = directoryPath / "attribute.json";
   const fs::path sampleAnnotationFile = directoryPath / "sample_annotation.json";
 
   scenes = loadScenesFromFile(sceneFile);
@@ -58,27 +59,10 @@ MetaDataReader::loadFromDirectory(const fs::path& directoryPath)
   calibratedSensorToken2CalibratedSensorInfo =
     loadCalibratedSensorInfo(calibratedSensorFile);
   sensorToken2CalibratedSensorName = loadCalibratedSensorNames(sensorFile);
-  //attributeInfo = loadAttributeInfo(attributeFile);
-  categories = loadCategories(categoryFile);
-  instances = loadInstances(instanceFile);
+  attributes = loadAttributeInfo(attributeFile);
+  categories = loadCategoryInfo(categoryFile);
+  instances = loadInstanceInfo(instanceFile);
   sample2SampleAnnotations = loadSampleAnnotations(sampleAnnotationFile);
-
-  // Decorate (add short-cut) sample_annotation info with the category name
-  for (auto& sample2SampleAnnotation : sample2SampleAnnotations)
-  {
-    for (auto& sampleAnnotation : sample2SampleAnnotation.second)
-    {
-      const auto& instanceInfo = findOrThrow(instances,
-                                             sampleAnnotation.instanceToken,
-                                             "unable to find instance_token");
-
-      const auto& categoryInfo = findOrThrow(categories,
-                                             instanceInfo.categoryToken,
-                                             "unable to find category_token");
-
-      sampleAnnotation.categoryName = categoryInfo.name;
-    }
-  }
 
   // build inverse (EgoPose.token -> Scene.token) map
   // and (scene.token -> calibratedSensor[]) map
@@ -397,6 +381,22 @@ MetaDataReader::getSceneCalibratedSensorInfo(const Token& sceneToken) const
   return sceneCalibratedSensorInfo;
 }
 
+const std::map<Token, InstanceInfo>&
+MetaDataReader::getInstanceInfo() const
+{
+  return instances;
+}
+
+const std::map<Token, AttributeInfo>& MetaDataReader::getAttributeInfo() const
+{
+  return attributes;
+}
+
+const std::map<Token, CategoryInfo>& MetaDataReader::getCategoryInfo() const
+{
+  return categories;
+}
+
 std::optional<SceneInfo>
 MetaDataReader::getSceneInfoByNumber(const uint32_t sceneNumber) const
 {
@@ -413,29 +413,27 @@ std::map<Token, AttributeInfo>
 MetaDataReader::loadAttributeInfo(const fs::path& filePath)
 {
   auto attributeJsons = slurpJsonFile(filePath);
-  std::map<Token, AttributeInfo> attributeInfo;
+  std::map<Token, AttributeInfo> attributes;
 
   for (const auto& json : attributeJsons)
   {
-    attributeInfo.insert({json["token"], AttributeInfo{json["name"],
-                                                       json["description"]
-                                                       }
+    attributes.insert({json["token"], AttributeInfo{json["token"], json["name"]}
                           });
   }
 
-  return attributeInfo;
+  return attributes;
 }
 
 std::map<Token, CategoryInfo>
-MetaDataReader::loadCategories(const fs::path& filePath)
+MetaDataReader::loadCategoryInfo(const fs::path& filePath)
 {
   auto categoryJsons = slurpJsonFile(filePath);
   std::map<Token, CategoryInfo> categoryInfo;
 
   for (const auto& json : categoryJsons)
   {
-    categoryInfo.insert({json["token"], CategoryInfo{json["name"],
-                                                     json["description"]
+    categoryInfo.insert({json["token"], CategoryInfo{json["token"], json["name"],
+                                                     json["index"]
                                                      }
                          });
   }
@@ -444,7 +442,7 @@ MetaDataReader::loadCategories(const fs::path& filePath)
 }
 
 std::map<Token, InstanceInfo>
-MetaDataReader::loadInstances(const fs::path& filePath)
+MetaDataReader::loadInstanceInfo(const fs::path& filePath)
 {
   auto instanceJsons = slurpJsonFile(filePath);
   std::map<Token, InstanceInfo> instanceInfo;
@@ -476,14 +474,15 @@ MetaDataReader::loadSampleAnnotations(const fs::path& filePath)
     const auto size = json["size"];
 
     sampleAnnotationInfo.push_back(SampleAnnotationInfo{json["token"],
-                                                        //json["sample_token"], // not used
+                                                        json["sample_token"],
                                                         json["instance_token"],
-                                                        //json["visibility_token"], // not used
-                                                        //json["attribute_tokens"], // not used
+                                                        json["visibility_token"],
+                                                        json["attribute_tokens"],
                                                         {translation[0], translation[1], translation[2]},
                                                         {rotation[0], rotation[1], rotation[2], rotation[3]},
                                                         {size[0], size[1], size[2]},
-                                                        std::string("") // category name
+                                                        json["num_lidar_pts"],
+                                                        json["num_radar_pts"]
                                                         }
                                    );
   }

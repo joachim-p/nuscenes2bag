@@ -47,15 +47,14 @@ struct SampleDataInfo {
 };
 
 struct AttributeInfo {
-    //Token token;
+    Token token;
     std::string name;
-    std::string description;
 };
 
 struct CategoryInfo {
-    //Token token;
+    Token token;
     std::string name;
-    std::string description;
+    int index;
 };
 
 struct InstanceInfo {
@@ -68,15 +67,15 @@ struct InstanceInfo {
 
 struct SampleAnnotationInfo {
     Token token;
-    //Token sampleToken;
+    Token sampleToken;
     Token instanceToken;
-    //Token visibilityToken;
-    //std::vector<Token> attributeTokens;
+    Token visibilityToken;
+    std::vector<Token> attributeTokens;
     float translation[3]; // x, y, z
     float rotation[4]; // w, x, y, z
     float size[3]; // width, length, height
-    std::string categoryName;
-    //std::vector<Token> anns;
+    int num_lidar_pts;
+    int num_radar_pts;
 };
 
 struct CalibratedSensorInfo {

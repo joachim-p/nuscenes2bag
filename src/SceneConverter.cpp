@@ -74,6 +74,9 @@ SceneConverter::submit(const Token& sceneToken, FileProgress& fileProgress)
   sceneAnnotations = metaDataProvider.getSceneSampleAnnotations(sceneToken);
   sampleDatas = metaDataProvider.getSceneSampleData(sceneToken);
   egoPoseInfos = metaDataProvider.getEgoPoseInfo(sceneToken);
+  instances = metaDataProvider.getInstanceInfo();
+  categories = metaDataProvider.getCategoryInfo();
+  attributes = metaDataProvider.getAttributeInfo();
 
   fileProgress.addToProcess(sampleDatas.size());
 }
@@ -243,26 +246,30 @@ SceneConverter::convertAnnotations(rosbag::Bag& outBag) // SampleType& sensorTyp
 
     const ros::Time& timestamp = stampUs2RosTime(sampleData.timeStamp);
 
-    // output sample token msg
+    // output sample token msg TODO move to convert sampleData()
     SampleToken msg;
     msg.stamp = timestamp;
     msg.sample_token = sampleData.sampleToken;
     msg.is_key_frame = sampleData.isKeyFrame;
     outBag.write("sample_token", timestamp, msg);
 
-    // output lidar sweep
+    // annotations are synced with lidar
     if (sampleType == SampleType::LIDAR) {
-      std::vector<Label> labels;
-      getLabels(sampleData, labels);
 
-      Labels labelsMsg;
-      labelsMsg.header.stamp = timestamp;
-      labelsMsg.header.frame_id = "map";
-      labelsMsg.labels = labels;
-      outBag.write("labels", timestamp, labelsMsg);
+      std_msgs::Header header;
+      header.stamp = timestamp;
+      header.frame_id = "map";
 
-      jsk_recognition_msgs::BoundingBoxArray labelsVizMsg = makeVisualizationMsg(labels, timestamp);
-      outBag.write("labels_viz", timestamp, labelsVizMsg);
+      SampleAnnotations msg;
+      msg.header = header;
+
+      std::vector<SampleAnnotation> annotations;
+      getAnnotations(sampleData, header, annotations);
+      msg.annotations = annotations;
+      outBag.write("annotations", timestamp, msg);
+
+      jsk_recognition_msgs::BoundingBoxArray viz_msg = makeVisualizationMsg(msg);
+      outBag.write("annotations_viz", timestamp, viz_msg);
     }
   }
 }
@@ -273,7 +280,7 @@ Eigen::Quaterniond makeQuaterniond(const float* rotation)
 }
 
 void
-SceneConverter::getLabels(const SampleDataInfo& sampleData, std::vector<Label>& labels)
+SceneConverter::getAnnotations(const SampleDataInfo& sampleData, const std_msgs::Header& header, std::vector<SampleAnnotation>& annotations)
 {
   const Token& currSampleToken = sampleData.sampleToken;
 
@@ -291,25 +298,24 @@ SceneConverter::getLabels(const SampleDataInfo& sampleData, std::vector<Label>& 
     // If sample data is a key frame, or no previous annotations are available,
     // return the annotations for the current sample.
 
-    std::vector<SampleAnnotationInfo> annotations;
+    std::vector<SampleAnnotationInfo> currAnnotations;
     {
       auto it = sceneAnnotations.find(currSampleToken);
       if (it == sceneAnnotations.end()) {
         std::cout << "can't find current sample token in sceneAnnotations" << std::endl;
         return;
       }
-      annotations = it->second;
+      currAnnotations = it->second;
     }
 
-    for (const auto& annotation: annotations)
+    for (const auto& annotation: currAnnotations)
     {
-      labels.push_back(makeLabel(annotation));
+      annotations.push_back(getAnnotation(annotation, header));
     }
-
     return;
   }
   else {
-    // Sample data is intermediate, use linear interpolation to estimate position of labels
+    // Sample data is intermediate, use linear interpolation to estimate position of annotations
 
     SampleInfo prevSample;
     {
@@ -360,7 +366,7 @@ SceneConverter::getLabels(const SampleDataInfo& sampleData, std::vector<Label>& 
       auto it = prevInstanceMap.find(annotation.instanceToken);
       if (it == prevInstanceMap.end()) {
         // The instance does not exist in the previous frame so get the current annotation.
-        labels.push_back(makeLabel(annotation));
+        annotations.push_back(getAnnotation(annotation, header));
       }
       else {
         // The annotated instance existed in the previous frame, therefore interpolate center & orientation.
@@ -381,50 +387,96 @@ SceneConverter::getLabels(const SampleDataInfo& sampleData, std::vector<Label>& 
         const Eigen::Quaterniond q1 = makeQuaterniond(annotation.rotation);
         const Eigen::Quaterniond rotation = q0.slerp(amount, q1);
 
-        auto label = makeLabel(annotation);
-        label.center.x = center.x();
-        label.center.y = center.y();
-        label.center.z = center.z();
-        label.orientation.x = rotation.x();
-        label.orientation.y = rotation.y();
-        label.orientation.z = rotation.z();
-        label.orientation.w = rotation.w();
+        auto msg = getAnnotation(annotation, header);
+        msg.translation.x = center.x();
+        msg.translation.y = center.y();
+        msg.translation.z = center.z();
+        msg.rotation.x = rotation.x();
+        msg.rotation.y = rotation.y();
+        msg.rotation.z = rotation.z();
+        msg.rotation.w = rotation.w();
 
-        labels.push_back(label);
+        annotations.push_back(msg);
       }
     }
   }
 }
 
-Eigen::Vector3d lerp(const double t, const Eigen::Vector3d& p0, const Eigen::Vector3d& p1) {
-  return t*p0 + (1.0 - t)*p1;
-}
-
-Label makeLabel(const SampleAnnotationInfo& annotation)
+SampleAnnotation SceneConverter::getAnnotation(const SampleAnnotationInfo& annotation, const std_msgs::Header& header)
 {
-  Label labelMsg;
+  SampleAnnotation msg;
+  msg.header = header;
+
+  msg.token = annotation.token;
+  msg.instance_token = annotation.instanceToken;
+  msg.sample_token = annotation.sampleToken;
+
+  // convert category and attributes
+  msg.category = getCategory(annotation.instanceToken);
+  msg.attributes = getAttributes(annotation.attributeTokens);
+  msg.visibility_token = annotation.visibilityToken;
 
   // NuScenes data is stored as float but ROS uses double
-  labelMsg.center.x = static_cast<double>(annotation.translation[0]);
-  labelMsg.center.y = static_cast<double>(annotation.translation[1]);
-  labelMsg.center.z = static_cast<double>(annotation.translation[2]);
+  msg.translation.x = static_cast<double>(annotation.translation[0]);
+  msg.translation.y = static_cast<double>(annotation.translation[1]);
+  msg.translation.z = static_cast<double>(annotation.translation[2]);
 
-  labelMsg.size.x = static_cast<double>(annotation.size[1]);
-  labelMsg.size.y = static_cast<double>(annotation.size[0]);
-  labelMsg.size.z = static_cast<double>(annotation.size[2]);
+  msg.size.x = static_cast<double>(annotation.size[1]);
+  msg.size.y = static_cast<double>(annotation.size[0]);
+  msg.size.z = static_cast<double>(annotation.size[2]);
 
-  labelMsg.orientation.w = static_cast<double>(annotation.rotation[0]);
-  labelMsg.orientation.x = static_cast<double>(annotation.rotation[1]);
-  labelMsg.orientation.y = static_cast<double>(annotation.rotation[2]);
-  labelMsg.orientation.z = static_cast<double>(annotation.rotation[3]);
+  msg.rotation.w = static_cast<double>(annotation.rotation[0]);
+  msg.rotation.x = static_cast<double>(annotation.rotation[1]);
+  msg.rotation.y = static_cast<double>(annotation.rotation[2]);
+  msg.rotation.z = static_cast<double>(annotation.rotation[3]);
 
-  labelMsg.label = 0;
+  msg.num_lidar_pts = annotation.num_lidar_pts;
+  msg.num_radar_pts = annotation.num_radar_pts;
 
-  labelMsg.token = annotation.instanceToken;
+  return msg;
+}
 
-  labelMsg.category_name = annotation.categoryName;
+Category SceneConverter::getCategory(const std::string& instanceToken)
+{
+  auto instance = instances.find(instanceToken);
+  if(instance == instances.end())
+  {
+    std::cout << "can't find instance token while searching for category" << std::endl;
+    return Category();
+  }
+  auto category = categories.find(instance->second.categoryToken);
+  if(category == categories.end())
+  {
+    std::cout << "can't find category token of given instance token" << std::endl;
+    return Category();
+  }
+  Category msg;
+  msg.token = category->second.token;
+  msg.name = category->second.name;
+  msg.index = category->second.index;
+  return msg;
+}
 
-  return labelMsg;
+std::vector<Attribute> SceneConverter::getAttributes(const std::vector<std::string>& attribute_tokens)
+{
+  std::vector<Attribute> out;
+  for (const auto& token : attribute_tokens) {
+    auto info = attributes.find(token);
+    if(info == attributes.end())
+    {
+      std::cout << "can't find category token of given instance token" << std::endl;
+    } else {
+      Attribute msg;
+      msg.token = info->second.token;
+      msg.name = info->second.name;
+      out.push_back(msg);
+    }
+  }
+  return out;
+}
+
+Eigen::Vector3d lerp(const double t, const Eigen::Vector3d& p0, const Eigen::Vector3d& p1) {
+  return t*p0 + (1.0 - t)*p1;
 }
 
 geometry_msgs::Point makePointMsg(const Eigen::Vector3d& point)
@@ -444,41 +496,38 @@ inline bool stringContains(const std::string& str, const std::string& substr)
   return false;
 }
 
-jsk_recognition_msgs::BoundingBox makeVisualizationMsg(const Label& label, const ros::Time& timestamp)
+jsk_recognition_msgs::BoundingBox makeVisualizationMsg(const SampleAnnotation& annotation)
 {
   jsk_recognition_msgs::BoundingBox msg;
+  msg.header = annotation.header;
 
-  msg.header.frame_id = "map";
-  msg.header.stamp = timestamp;
-
-  msg.pose.position.x = label.center.x;
-  msg.pose.position.y = label.center.y;
-  msg.pose.position.z = label.center.z;
+  msg.pose.position.x = annotation.translation.x;
+  msg.pose.position.y = annotation.translation.y;
+  msg.pose.position.z = annotation.translation.z;
   
-  msg.pose.orientation.x = label.orientation.x;
-  msg.pose.orientation.y = label.orientation.y;
-  msg.pose.orientation.z = label.orientation.z;
-  msg.pose.orientation.w = label.orientation.w;
+  msg.pose.orientation.x = annotation.rotation.x;
+  msg.pose.orientation.y = annotation.rotation.y;
+  msg.pose.orientation.z = annotation.rotation.z;
+  msg.pose.orientation.w = annotation.rotation.w;
 
-  msg.dimensions.x = label.size.x;
-  msg.dimensions.y = label.size.y;
-  msg.dimensions.z = label.size.z;
+  msg.dimensions.x = annotation.size.x;
+  msg.dimensions.y = annotation.size.y;
+  msg.dimensions.z = annotation.size.z;
 
-  msg.value = 1.0; // labels are always correct
-  msg.label = label.label;
+  msg.value = 1.0; // assume annotations to be correct
+  msg.label = 0; // TODO use category index?
 
   return msg;
 }
 
-jsk_recognition_msgs::BoundingBoxArray makeVisualizationMsg(const std::vector<Label>& labels, const ros::Time& timestamp)
+jsk_recognition_msgs::BoundingBoxArray makeVisualizationMsg(const SampleAnnotations& annotations)
 {
   jsk_recognition_msgs::BoundingBoxArray msg;
-  msg.header.frame_id = "map";
-  msg.header.stamp = timestamp;
+  msg.header = annotations.header;
 
-  for (const auto& label : labels)
+  for (const auto& annotation : annotations.annotations)
   {
-    msg.boxes.push_back(makeVisualizationMsg(label, timestamp));
+    msg.boxes.push_back(makeVisualizationMsg(annotation));
   }
 
   return msg;

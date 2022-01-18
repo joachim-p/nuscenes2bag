@@ -32,7 +32,7 @@ find_package(OpenCV REQUIRED core)
 
 add_message_files(FILES
                   RadarObjects.msg RadarObject.msg
-                  Labels.msg Label.msg
+                  SampleAnnotations.msg SampleAnnotation.msg Attribute.msg Category.msg
                   SampleToken.msg
                   )
 
