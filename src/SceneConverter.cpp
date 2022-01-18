@@ -145,6 +145,14 @@ SceneConverter::convertSampleDatas(rosbag::Bag& outBag,
       cout << "Unknown sample type" << endl;
     }
 
+    // output sample token msg
+    SampleToken msg;
+    auto timestamp = stampUs2RosTime(sampleData.timeStamp);
+    msg.stamp = timestamp;
+    msg.sample_token = sampleData.sampleToken;
+    msg.is_key_frame = sampleData.isKeyFrame;
+    outBag.write("sample_token", timestamp, msg);
+
     fileProgress.addToProcessed(1);
   }
 }
@@ -245,13 +253,6 @@ SceneConverter::convertAnnotations(rosbag::Bag& outBag) // SampleType& sensorTyp
     std::string sensorName = toLower(calibratedSensorName.name);
 
     const ros::Time& timestamp = stampUs2RosTime(sampleData.timeStamp);
-
-    // output sample token msg TODO move to convert sampleData()
-    SampleToken msg;
-    msg.stamp = timestamp;
-    msg.sample_token = sampleData.sampleToken;
-    msg.is_key_frame = sampleData.isKeyFrame;
-    outBag.write("sample_token", timestamp, msg);
 
     // annotations are synced with lidar
     if (sampleType == SampleType::LIDAR) {
