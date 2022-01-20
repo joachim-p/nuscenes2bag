@@ -148,7 +148,7 @@ SceneConverter::convertSampleDatas(rosbag::Bag& outBag,
     // output sample token msg
     SampleToken msg;
     auto timestamp = stampUs2RosTime(sampleData.timeStamp);
-    msg.stamp = timestamp;
+    msg.header.stamp = timestamp;
     msg.sample_token = sampleData.sampleToken;
     msg.is_key_frame = sampleData.isKeyFrame;
     outBag.write("sample_token", timestamp, msg);
