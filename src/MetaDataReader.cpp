@@ -54,15 +54,24 @@ MetaDataReader::loadFromDirectory(const fs::path& directoryPath)
   const fs::path sampleAnnotationFile = directoryPath / "sample_annotation.json";
 
   scenes = loadScenesFromFile(sceneFile);
+  std::cout << "successfully loaded scenes" << std::endl;
   scene2Samples = loadSampleInfos(sampleFile);
+  std::cout << "successfully loaded sample info" << std::endl;
   sample2SampleData = loadSampleDataInfos(sampleDataFile);
+  std::cout << "successfully loaded sample data" << std::endl;
   calibratedSensorToken2CalibratedSensorInfo =
     loadCalibratedSensorInfo(calibratedSensorFile);
+  std::cout << "successfully loaded calibrated sensor info" << std::endl;
   sensorToken2CalibratedSensorName = loadCalibratedSensorNames(sensorFile);
+  std::cout << "successfully loaded calibrated sensor names" << std::endl;
   attributes = loadAttributeInfo(attributeFile);
+  std::cout << "successfully loaded attribute info" << std::endl;
   categories = loadCategoryInfo(categoryFile);
+  std::cout << "successfully loaded category info" << std::endl;
   instances = loadInstanceInfo(instanceFile);
+  std::cout << "successfully loaded instances" << std::endl;
   sample2SampleAnnotations = loadSampleAnnotations(sampleAnnotationFile);
+  std::cout << "successfully loaded sample annotations" << std::endl;
 
   // build inverse (EgoPose.token -> Scene.token) map
   // and (scene.token -> calibratedSensor[]) map
