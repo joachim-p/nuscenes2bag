@@ -64,23 +64,33 @@ NuScenes2Bag::convertDirectory(const fs::path& inDatasetPath,
   if(sceneNumberOpt.has_value()) {
     auto sceneInfoOpt = metaDataReader.getSceneInfoByNumber(sceneNumberOpt.value());
     if(sceneInfoOpt.has_value()) {
-      chosenSceneTokens.push_back(sceneInfoOpt->token);
+      chosenSceneTokens.push_back(sceneInfoOpt.value().token);
     } else {
       std::cout << "Scene with ID=" << sceneNumberOpt.value() << " not found!" << std::endl;
     }
   } else {
-    chosenSceneTokens = metaDataReader.getAllSceneTokens();;
+    chosenSceneTokens = metaDataReader.getAllSceneTokens();
   }
 
   for (const auto& sceneToken : chosenSceneTokens) {
     std::unique_ptr<SceneConverter> sceneConverter =
       std::make_unique<SceneConverter>(metaDataReader);
-    sceneConverter->submit(sceneToken, fileProgress);
-    SceneConverter* sceneConverterPtr = sceneConverter.get();
-    sceneConverters.push_back(std::move(sceneConverter));
-    boost::asio::defer(pool, [&, sceneConverterPtr]() {
-      sceneConverterPtr->run(inDatasetPath, outputRosbagPath, fileProgress);
-    });
+
+    try
+    {
+      sceneConverter->submit(sceneToken, fileProgress);
+      SceneConverter* sceneConverterPtr = sceneConverter.get();
+      sceneConverters.push_back(std::move(sceneConverter));
+      boost::asio::defer(pool, [&, sceneConverterPtr]() {
+        sceneConverterPtr->run(inDatasetPath, outputRosbagPath, fileProgress);
+      });
+    }
+    catch (nuscenes2bag::InvalidMetaDataException e)
+    {
+      std::cout << "skipping scene due to error within scene conversion" << std::endl;
+      std::cout << e.what() << std::endl;
+      continue;
+    }
   }
 
   RunEvery showProgress(std::chrono::milliseconds(1000), [&fileProgress]() {
