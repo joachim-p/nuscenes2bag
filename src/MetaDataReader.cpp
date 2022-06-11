@@ -348,7 +348,14 @@ MetaDataReader::getSceneSampleAnnotations(const Token& sceneToken) const
 
   for (const auto& sceneSample : sceneSamples) {
     const Token& sampleToken = sceneSample.token;
-    const std::vector<SampleAnnotationInfo>& sampleAnnotations = findOrThrow(sample2SampleAnnotations, sampleToken, "unable to find sample for scene token");
+    std::vector<SampleAnnotationInfo> sampleAnnotations;
+    try {
+      sampleAnnotations = findOrThrow(sample2SampleAnnotations,
+                                      sampleToken,
+                                      "unable to find sample annotation for sample token");
+    } catch (InvalidMetaDataException e) {
+      // hacky solution: better add empty vector of sampleannotations for all samples without annotations
+    }
     annotations.insert({sampleToken, sampleAnnotations});
   }
 
@@ -486,6 +493,8 @@ MetaDataReader::loadSampleAnnotations(const fs::path& filePath)
                                                         }
                                    );
   }
+
+  // TODO create empty sample annotation vector for samples without annotations, otherwise the entire scene is skipped
 
   return sampleAnnotations;
 }
